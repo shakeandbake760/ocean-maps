@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en" >
+<head>
+  <meta charset="UTF-8">
+  <title>Ocean TempCurrent2</title>
+  
+
+</head>
+<body>
+<!-- partial:index.partial.html -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no" />
+    <title>FlowRender Project</title>
+    
+    <!-- Load Calcite components from CDN -->
+    <script type="module" src="https://js.arcgis.com/calcite-components/3.2.1/calcite.esm.js"></script>
+
+    <!-- Load the ArcGIS Maps SDK for JavaScript from CDN -->
+    <link rel="stylesheet" href="https://js.arcgis.com/4.33/esri/themes/dark/main.css" />
+    <script src="https://js.arcgis.com/4.33/"></script>
+
+    <!-- Load Map components from CDN-->
+    <script type="module" src="https://js.arcgis.com/4.33/map-components/"></script>
+    <style>
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+      }
+      arcgis-map {
+  background-color: #1e1e1e; /* or any other dark color */
+}
+      #credits {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  color: #ccc;
+  font-size: 12px;
+  background-color: rgba(0, 0, 0, 0.5);
+  padding: 6px 10px;
+  border-radius: 4px;
+  z-index: 99;
+}
+    </style>
+  </head>
+  <body class="calcite-mode-dark">
+    <arcgis-map id="arcgisMap" center="-160, 0" zoom="2">
+      <arcgis-zoom position="top-left"></arcgis-zoom>
+      <arcgis-fullscreen position="top-left"></arcgis-fullscreen>
+      <arcgis-legend position="top-right"></arcgis-legend>
+<div style="position: absolute; top: 20px; left: 60px; z-index: 99; display: flex; align-items: center; gap: 8px;">
+  <label for="basemapToggle" style="color: white; font-family: sans-serif;">Standard ↔ Spilhaus Projection 🌍</label>
+  <calcite-switch id="basemapToggle" checked></calcite-switch>
+</div>
+    </arcgis-map>
+
+    <script type="module">
+  const [
+    Map,
+    Basemap,
+    ImageryTileLayer,
+    TileLayer,
+    GroupLayer,
+    MultipartColorRamp,
+    AlgorithmicColorRamp,
+    Color
+  ] = await $arcgis.import([
+    "@arcgis/core/Map.js",
+    "@arcgis/core/Basemap.js",
+    "@arcgis/core/layers/ImageryTileLayer.js",
+    "@arcgis/core/layers/TileLayer.js",
+    "@arcgis/core/layers/GroupLayer.js",
+    "@arcgis/core/rest/support/MultipartColorRamp.js",
+    "@arcgis/core/rest/support/AlgorithmicColorRamp.js",
+    "@arcgis/core/Color.js"
+  ]);
+
+  const viewElement = document.querySelector("arcgis-map");
+  const legend = document.querySelector("arcgis-legend");
+  const basemapToggle = document.getElementById("basemapToggle");
+
+  // ----- Common color ramp used in both maps -----
+  const colorRamp = new MultipartColorRamp({
+    colorRamps: [
+      new AlgorithmicColorRamp({ fromColor: new Color([20, 100, 150, 255]), toColor: new Color([70, 0, 150, 255]) }),
+      new AlgorithmicColorRamp({ fromColor: new Color([70, 0, 150, 255]), toColor: new Color([170, 0, 120, 255]) }),
+      new AlgorithmicColorRamp({ fromColor: new Color([170, 0, 120, 255]), toColor: new Color([230, 100, 60, 255]) }),
+      new AlgorithmicColorRamp({ fromColor: new Color([230, 100, 60, 255]), toColor: new Color([255, 170, 0, 255]) }),
+      new AlgorithmicColorRamp({ fromColor: new Color([255, 170, 0, 255]), toColor: new Color([255, 255, 0, 255]) })
+    ]
+  });
+
+
+  function createSpilhausMap() {
+    const spilhausBasemap = new TileLayer({
+      url: "https://tiles.arcgis.com/tiles/nGt4QxSblgDfeJn9/arcgis/rest/services/Spilhaus_Vibrant_Basemap/MapServer",
+      effect: "saturate(10%) brightness(0.3)"
+    });
+
+    const temperatureLayer = new ImageryTileLayer({
+      url: "https://tiledimageservices.arcgis.com/jIL9msH9OI208GCb/arcgis/rest/services/HyCOM_Surface_Temperature___Spilhaus/ImageServer",
+      renderer: { colorRamp, stretchType: "min-max", type: "raster-stretch" }
+    });
+
+    const currentsLayer = new ImageryTileLayer({
+      url: "https://tiledimageservices.arcgis.com/jIL9msH9OI208GCb/arcgis/rest/services/Spilhaus_UV_ocean_currents/ImageServer",
+      renderer: {
+        type: "flow",
+        density: 1,
+        maxPathLength: 10,
+        trailWidth: "2px"
+      },
+      blendMode: "destination-in"
+    });
+
+    const groupLayer = new GroupLayer({
+      effect: "bloom(2, 0.5px, 0.0)",
+      layers: [temperatureLayer, currentsLayer]
+    });
+
+    const map = new Map({
+      basemap: new Basemap({ baseLayers: [spilhausBasemap] }),
+      layers: [groupLayer]
+    });
+    
+        map.initialViewProperties = {
+  extent: {
+    xmin: -17000000,
+    ymin: -12000000,
+    xmax: 17000000,
+    ymax: 12000000,
+    spatialReference: { wkid: 54099 }
+
+  }
+};
+    legend.layerInfos = [{ layer: temperatureLayer, title: "Sea surface temperature" }];
+    
+
+
+    return map;
+  }
+
+  function createStandardMap() {
+    const standardBasemap = "dark-gray-vector"; // or "topo", "streets", etc.
+    
+
+    const temperatureLayer = new ImageryTileLayer({
+      url: "https://tiledimageservices.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/OISST_Daily_SST/ImageServer",
+  renderer: {
+    type: "raster-stretch",
+    stretchType: "min-max",
+    colorRamp: colorRamp,
+    useGamma: false,
+    customStatistics: [{
+    min: -1.7,
+    max: 38.6,
+    stddev: 0,   // required field, even if unused
+    mean: 0      // required field, even if unused
+  }]
+}
+});
+    
+    const currentsLayer = new ImageryTileLayer({
+  url: "https://tiledimageservices.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/HYCOM_Currents__UV_/ImageServer", // <-- your new URL
+  renderer: {
+    type: "flow",
+    density: 1,
+    maxPathLength: 10,
+    trailWidth: "2px"
+  },
+  blendMode: "destination-in"
+});
+      const groupLayer = new GroupLayer({
+      effect: "bloom(2, 0.5px, 0.0)",
+      layers: [temperatureLayer, currentsLayer]
+    });
+    const map = new Map({
+      basemap: standardBasemap,
+      layers: [groupLayer]
+    });
+map.initialViewProperties = {
+  extent: {
+    xmin: 110,
+    ymin: -30,
+    xmax: -80,
+    ymax: 30,
+    spatialReference: { wkid: 4326 }
+  }
+};
+    legend.layerInfos = [{ layer: temperatureLayer, title: "Sea surface temperature" }];
+
+    return map;
+  }
+
+  // ----- Initial map load -----
+
+  let currentMap = createStandardMap();
+  viewElement.map = currentMap;
+      
+
+
+  // Now safe to enable toggle too
+basemapToggle.addEventListener("calciteSwitchChange", (event) => {
+  const useStandard = event.target.checked;
+
+  // Create the map depending on toggle
+  const nextMap = useStandard ? createStandardMap() : createSpilhausMap();
+  
+  // Assign the new map to the view element
+  viewElement.map = nextMap;
+  
+  // When the view is ready, set the center and zoom accordingly
+  viewElement.addEventListener(
+    "arcgisViewReadyChange",
+    () => {
+      if (viewElement.view) {
+        if (useStandard) {
+          // Web Mercator / Geographic center & zoom
+          viewElement.view.center = [-160, 0]; // lon, lat
+          viewElement.view.zoom = 2;
+        } else {
+          // Spilhaus projection uses meters, so pick a suitable center/zoom
+          // NOTE: center needs to be in the projection's coordinates (WKID 54099)
+          viewElement.view.center = [100, -20]; // roughly center of Spilhaus projection
+          viewElement.view.zoom = 4; // Adjust this number as needed for zoom level
+         viewElement.view.constraints = {
+           minZoom: 3 // ⬅️ adjust this to your preferred zoom limit
+        };
+        }
+      }
+    },
+    { once: true }
+  );
+});
+</script>
+    <div style="
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: rgba(0, 0, 0, 0.6);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 1.2rem;
+  font-weight: bold;
+  font-family: sans-serif;
+  z-index: 100;
+">
+  🌊 Ocean Currents & Temperature 🌡️
+</div>
+    <div style="
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  background-color: rgba(0, 0, 0, 0.6);
+  color: white;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-family: sans-serif;
+  font-size: 0.85rem;
+  z-index: 100;
+  max-width: 280px;
+">
+  To learn more about the Spilhaus projection, visit
+  <a href="https://www.esri.com/arcgis-blog/products/arcgis-pro/mapping/spilhaus-more-like-thrillhaus" 
+     target="_blank" 
+     style="color: #66ccff; text-decoration: underline;">
+    this Esri blog post
+  </a>.
+</div>
+    
+    <div id="credits">
+  Data from HyCOM (Hybrid Coordinate Ocean Model), made available by Esri
+</div>
+  </body>
+</html>
+<!-- partial -->
+  
+</body>
+</html>
