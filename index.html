@@ -34,12 +34,12 @@
 }
       #credits {
   position: absolute;
-  bottom: 10px;
+  bottom: 14px;
   right: 10px;
   color: #ccc;
   font-size: 12px;
   background-color: rgba(0, 0, 0, 0.5);
-  padding: 6px 10px;
+  padding: 6px 8px;
   border-radius: 4px;
   z-index: 99;
 }
@@ -47,15 +47,36 @@
   </head>
   <body class="calcite-mode-dark">
     <arcgis-map id="arcgisMap" center="-160, 0" zoom="2">
+      <arcgis-home position="top-left"></arcgis-home>
       <arcgis-zoom position="top-left"></arcgis-zoom>
       <arcgis-fullscreen position="top-left"></arcgis-fullscreen>
-      <arcgis-legend position="top-right"></arcgis-legend>
+<div id="legendContainer" style="position: absolute; top: 20px; right: 20px; width: 40px;">
+  <arcgis-legend position="top-right"></arcgis-legend>
+</div>
 <div style="position: absolute; top: 20px; left: 60px; z-index: 99; display: flex; align-items: center; gap: 8px;">
-  <label for="basemapToggle" style="color: white; font-family: sans-serif;">Standard ↔ Spilhaus Projection 🌍</label>
+  <label for="basemapToggle" style="color: white; font-family: sans-serif;">Spilhaus ↔ Standard Projection 🌍</label>
   <calcite-switch id="basemapToggle" checked></calcite-switch>
+  <arcgis-scale-bar position="bottom-left"></arcgis-scale-bar>
 </div>
     </arcgis-map>
-
+    
+<div id="mapTitle" style="
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-size: 24px;
+  z-index: 100;
+  opacity: 1;
+  transition: opacity 1s ease-in-out;
+">
+  Ocean Currents and Temperature
+</div>
+    
     <script type="module">
   const [
     Map,
@@ -80,7 +101,28 @@
   const viewElement = document.querySelector("arcgis-map");
   const legend = document.querySelector("arcgis-legend");
   const basemapToggle = document.getElementById("basemapToggle");
+      
+      function applyViewSettings(useStandard) {
+  const view = viewElement.view;
 
+  if (view) {
+    if (useStandard) {
+      view.center = [-130, -20];
+      view.zoom = 2;
+      view.constraints = {}; // Clear constraints for standard
+    } else {
+      view.center = [100, -40];
+      view.zoom = 4;
+      view.constraints = {
+        minZoom: 3,
+        maxZoom: 6
+      };
+    }
+  }
+}
+
+      
+      
   // ----- Common color ramp used in both maps -----
   const colorRamp = new MultipartColorRamp({
     colorRamps: [
@@ -125,20 +167,9 @@
       layers: [groupLayer]
     });
     
-        map.initialViewProperties = {
-  extent: {
-    xmin: -17000000,
-    ymin: -12000000,
-    xmax: 17000000,
-    ymax: 12000000,
-    spatialReference: { wkid: 54099 }
 
-  }
-};
-    legend.layerInfos = [{ layer: temperatureLayer, title: "Sea surface temperature" }];
+    legend.layerInfos = [{ layer: temperatureLayer, title: "Sea surface temperature (°C)" }];
     
-
-
     return map;
   }
 
@@ -180,16 +211,8 @@
       basemap: standardBasemap,
       layers: [groupLayer]
     });
-map.initialViewProperties = {
-  extent: {
-    xmin: 110,
-    ymin: -30,
-    xmax: -80,
-    ymax: 30,
-    spatialReference: { wkid: 4326 }
-  }
-};
-    legend.layerInfos = [{ layer: temperatureLayer, title: "Sea surface temperature" }];
+
+    legend.layerInfos = [{ layer: temperatureLayer, title: "Sea surface temperature (°C)" }];
 
     return map;
   }
@@ -199,7 +222,15 @@ map.initialViewProperties = {
   let currentMap = createStandardMap();
   viewElement.map = currentMap;
       
-
+setTimeout(() => {
+  const titleEl = document.getElementById("mapTitle");
+  if (titleEl) {
+    titleEl.style.opacity = "0"; // fade out
+    setTimeout(() => {
+      titleEl.style.display = "none"; // hide completely after fade
+    }, 1000); // wait for fade-out transition to complete
+  }
+}, 8000); // show for 8 seconds
 
   // Now safe to enable toggle too
 basemapToggle.addEventListener("calciteSwitchChange", (event) => {
@@ -211,54 +242,24 @@ basemapToggle.addEventListener("calciteSwitchChange", (event) => {
   // Assign the new map to the view element
   viewElement.map = nextMap;
   
-  // When the view is ready, set the center and zoom accordingly
+// When the new map is ready, update the view settings
   viewElement.addEventListener(
     "arcgisViewReadyChange",
-    () => {
-      if (viewElement.view) {
-        if (useStandard) {
-          // Web Mercator / Geographic center & zoom
-          viewElement.view.center = [-160, 0]; // lon, lat
-          viewElement.view.zoom = 2;
-        } else {
-          // Spilhaus projection uses meters, so pick a suitable center/zoom
-          // NOTE: center needs to be in the projection's coordinates (WKID 54099)
-          viewElement.view.center = [100, -20]; // roughly center of Spilhaus projection
-          viewElement.view.zoom = 4; // Adjust this number as needed for zoom level
-         viewElement.view.constraints = {
-           minZoom: 3 // ⬅️ adjust this to your preferred zoom limit
-        };
-        }
-      }
-    },
+    () => applyViewSettings(useStandard),
     { once: true }
   );
 });
+      
 </script>
+
     <div style="
   position: absolute;
-  top: 10px;
-  left: 50%;
-  transform: translateX(-50%);
+  bottom: 60px;
+  left: 10px;
   background-color: rgba(0, 0, 0, 0.6);
   color: white;
-  padding: 8px 16px;
-  border-radius: 6px;
-  font-size: 1.2rem;
-  font-weight: bold;
-  font-family: sans-serif;
-  z-index: 100;
-">
-  🌊 Ocean Currents & Temperature 🌡️
-</div>
-    <div style="
-  position: absolute;
-  bottom: 20px;
-  left: 20px;
-  background-color: rgba(0, 0, 0, 0.6);
-  color: white;
-  padding: 8px 12px;
-  border-radius: 6px;
+  padding: 4px 8px;
+  border-radius: 5px;
   font-family: sans-serif;
   font-size: 0.85rem;
   z-index: 100;
